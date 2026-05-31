@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Emotion-Aware Smart Room</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #0a0a0f;
+    --surface:   #12121a;
+    --border:    #1e1e2e;
+    --text:      #e8e8f0;
+    --muted:     #5a5a7a;
+    --happy:     #f7c948;
+    --sad:       #5b9cf6;
+    --angry:     #f75b5b;
+    --fear:      #b05bf7;
+    --surprise:  #5bf7b0;
+    --neutral:   #9a9ab0;
+    --disgust:   #f7a05b;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Background grid ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.02) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 40px 24px;
+  }
+
+  /* ── Header ── */
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 48px;
+  }
+
+  .logo {
+    font-size: 13px;
+    font-family: 'Space Mono', monospace;
+    color: var(--muted);
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--muted);
+    display: inline-block;
+    margin-right: 8px;
+    transition: background .3s;
+  }
+  .status-dot.connected { background: #5bf7b0; box-shadow: 0 0 8px #5bf7b080; }
+
+  /* ── Hero emotion display ── */
+  .hero {
+    text-align: center;
+    margin-bottom: 56px;
+    position: relative;
+  }
+
+  .emotion-glow {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 320px; height: 320px;
+    border-radius: 50%;
+    filter: blur(80px);
+    opacity: .12;
+    background: var(--current-color, var(--neutral));
+    transition: background 1s, opacity .8s;
+    pointer-events: none;
+  }
+
+  .emotion-emoji {
+    font-size: 96px;
+    line-height: 1;
+    margin-bottom: 16px;
+    display: block;
+    filter: drop-shadow(0 0 24px var(--current-color, var(--neutral)));
+    transition: filter 1s;
+    animation: float 4s ease-in-out infinite;
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50%       { transform: translateY(-10px); }
+  }
+
+  .emotion-label {
+    font-size: 64px;
+    font-weight: 800;
+    letter-spacing: -.02em;
+    color: var(--current-color, var(--neutral));
+    transition: color .8s;
+    text-transform: uppercase;
+    line-height: 1;
+    margin-bottom: 12px;
+  }
+
+  .emotion-vi {
+    font-family: 'Space Mono', monospace;
+    font-size: 14px;
+    color: var(--muted);
+    letter-spacing: .1em;
+    margin-bottom: 24px;
+  }
+
+  .confidence-bar-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    padding: 8px 20px;
+  }
+
+  .confidence-bar {
+    width: 140px; height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .confidence-fill {
+    height: 100%;
+    background: var(--current-color, var(--neutral));
+    border-radius: 2px;
+    transition: width 1s ease, background 1s;
+    width: 0%;
+  }
+
+  .confidence-num {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    min-width: 40px;
+  }
+
+  /* ── GPIO info ── */
+  .gpio-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 16px;
+  }
+
+  .gpio-pin {
+    color: var(--current-color, var(--neutral));
+    font-weight: 700;
+    transition: color .8s;
+  }
+
+  /* ── History grid ── */
+  .section-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+
+  .history-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 8px;
+    margin-bottom: 48px;
+  }
+
+  .history-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 8px;
+    text-align: center;
+    transition: border-color .3s;
+    cursor: default;
+  }
+
+  .history-item.active {
+    border-color: var(--current-color, var(--neutral));
+    box-shadow: 0 0 16px -4px var(--current-color, var(--neutral));
+  }
+
+  .history-item .h-emoji { font-size: 28px; display: block; margin-bottom: 4px; }
+  .history-item .h-name  {
+    font-size: 10px;
+    font-family: 'Space Mono', monospace;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+  }
+  .history-item .h-count {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+    margin: 2px 0;
+  }
+
+  /* ── Log ── */
+  .log-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+    max-height: 220px;
+    overflow-y: auto;
+  }
+
+  .log-wrap::-webkit-scrollbar { width: 4px; }
+  .log-wrap::-webkit-scrollbar-track { background: transparent; }
+  .log-wrap::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .log-entry {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+
+  .log-entry:last-child { border-bottom: none; }
+  .log-time   { color: var(--muted); min-width: 70px; }
+  .log-emotion { font-weight: 700; }
+  .log-conf   { color: var(--muted); }
+
+  /* ── Connection banner ── */
+  #conn-banner {
+    position: fixed;
+    bottom: 24px; left: 50%;
+    transform: translateX(-50%);
+    background: #f75b5b18;
+    border: 1px solid #f75b5b40;
+    border-radius: 100px;
+    padding: 10px 24px;
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    color: #f75b5b;
+    display: none;
+    z-index: 100;
+    animation: pulse-border 1.5s infinite;
+  }
+
+  @keyframes pulse-border {
+    0%, 100% { border-color: #f75b5b40; }
+    50%       { border-color: #f75b5b90; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- Header -->
+  <header>
+    <span class="logo">Emotion-Aware Smart Room</span>
+    <span class="logo">
+      <span class="status-dot" id="dot"></span>
+      <span id="conn-label">Connecting…</span>
+    </span>
+  </header>
+
+  <!-- Hero -->
+  <div class="hero">
+    <div class="emotion-glow" id="glow"></div>
+    <span class="emotion-emoji" id="emoji">😐</span>
+    <div class="emotion-label" id="emotion-label">NEUTRAL</div>
+    <div class="emotion-vi"   id="emotion-vi">Bình thường</div>
+    <div class="confidence-bar-wrap">
+      <div class="confidence-bar">
+        <div class="confidence-fill" id="conf-fill"></div>
+      </div>
+      <span class="confidence-num" id="conf-num">0%</span>
+    </div>
+    <br>
+    <div class="gpio-badge">
+      ESP32 GPIO <span class="gpio-pin" id="gpio-pin">21</span>
+      &nbsp;→&nbsp; LED đang sáng
+    </div>
+  </div>
+
+  <!-- History -->
+  <div class="section-label">Thống kê phiên</div>
+  <div class="history-grid" id="history-grid"></div>
+
+  <!-- Log -->
+  <div class="section-label">Nhật ký</div>
+  <div class="log-wrap" id="log"></div>
+
+</div>
+
+<div id="conn-banner">⚠ Mất kết nối WebSocket — đang thử lại…</div>
+
+<script>
+// ─────────────────────────────────────────────
+// DATA
+// ─────────────────────────────────────────────
+const WS_URL = "ws://localhost:8765";  // địa chỉ Python WebSocket
+
+const EMOTIONS = {
+  happy:    { emoji: "😊", color: "#f7c948", vi: "Vui vẻ",     gpio: 2  },
+  sad:      { emoji: "😢", color: "#5b9cf6", vi: "Buồn bã",    gpio: 4  },
+  angry:    { emoji: "😠", color: "#f75b5b", vi: "Tức giận",   gpio: 5  },
+  fear:     { emoji: "😨", color: "#b05bf7", vi: "Sợ hãi",     gpio: 18 },
+  surprise: { emoji: "😲", color: "#5bf7b0", vi: "Ngạc nhiên", gpio: 19 },
+  neutral:  { emoji: "😐", color: "#9a9ab0", vi: "Bình thường",gpio: 21 },
+  disgust:  { emoji: "🤢", color: "#f7a05b", vi: "Ghê tởm",    gpio: 22 },
+};
+
+const counts = {};
+Object.keys(EMOTIONS).forEach(k => counts[k] = 0);
+
+let currentEmotion = "neutral";
+
+// ─────────────────────────────────────────────
+// DOM HELPERS
+// ─────────────────────────────────────────────
+function updateHero(data) {
+  const e = EMOTIONS[data.emotion] || EMOTIONS.neutral;
+  currentEmotion = data.emotion;
+
+  document.documentElement.style.setProperty("--current-color", e.color);
+  document.getElementById("glow").style.background = e.color;
+  document.getElementById("emoji").textContent        = e.emoji;
+  document.getElementById("emotion-label").textContent = data.emotion.toUpperCase();
+  document.getElementById("emotion-vi").textContent   = e.vi;
+  document.getElementById("conf-fill").style.width    = data.confidence + "%";
+  document.getElementById("conf-num").textContent     = Math.round(data.confidence) + "%";
+  document.getElementById("gpio-pin").textContent     = data.gpio;
+}
+
+function buildHistoryGrid() {
+  const grid = document.getElementById("history-grid");
+  grid.innerHTML = "";
+  Object.entries(EMOTIONS).forEach(([key, meta]) => {
+    const div = document.createElement("div");
+    div.className = "history-item" + (key === currentEmotion ? " active" : "");
+    div.id = "hist-" + key;
+    div.innerHTML = `
+      <span class="h-emoji">${meta.emoji}</span>
+      <div class="h-count" id="cnt-${key}">${counts[key]}</div>
+      <div class="h-name">${key}</div>
+    `;
+    grid.appendChild(div);
+  });
+}
+
+function updateHistoryGrid(emotion) {
+  Object.keys(EMOTIONS).forEach(k => {
+    const el = document.getElementById("hist-" + k);
+    if (el) el.classList.toggle("active", k === emotion);
+  });
+  const cnt = document.getElementById("cnt-" + emotion);
+  if (cnt) cnt.textContent = counts[emotion];
+}
+
+function addLog(data) {
+  const log = document.getElementById("log");
+  const e = EMOTIONS[data.emotion] || EMOTIONS.neutral;
+  const time = new Date(data.timestamp * 1000).toLocaleTimeString("vi-VN");
+  const div = document.createElement("div");
+  div.className = "log-entry";
+  div.innerHTML = `
+    <span class="log-time">${time}</span>
+    <span class="log-emotion" style="color:${e.color}">${e.emoji} ${data.emotion}</span>
+    <span class="log-conf">${Math.round(data.confidence)}%</span>
+    <span class="log-conf">GPIO${data.gpio}</span>
+  `;
+  log.prepend(div);
+  // Giữ tối đa 50 dòng log
+  while (log.children.length > 50) log.removeChild(log.lastChild);
+}
+
+// ─────────────────────────────────────────────
+// WEBSOCKET
+// ─────────────────────────────────────────────
+let ws = null;
+let reconnectTimer = null;
+
+function connect() {
+  ws = new WebSocket(WS_URL);
+
+  ws.onopen = () => {
+    document.getElementById("dot").classList.add("connected");
+    document.getElementById("conn-label").textContent = "Đã kết nối";
+    document.getElementById("conn-banner").style.display = "none";
+    clearTimeout(reconnectTimer);
+    console.log("[WS] Connected");
+  };
+
+  ws.onmessage = (evt) => {
+    try {
+      const data = JSON.parse(evt.data);
+      if (!data.emotion) return;
+
+      counts[data.emotion] = (counts[data.emotion] || 0) + 1;
+      updateHero(data);
+      updateHistoryGrid(data.emotion);
+      addLog(data);
+    } catch (err) {
+      console.error("[WS] Parse error:", err);
+    }
+  };
+
+  ws.onclose = () => {
+    document.getElementById("dot").classList.remove("connected");
+    document.getElementById("conn-label").textContent = "Mất kết nối";
+    document.getElementById("conn-banner").style.display = "block";
+    console.log("[WS] Disconnected, retry in 3s…");
+    reconnectTimer = setTimeout(connect, 3000);
+  };
+
+  ws.onerror = (err) => {
+    console.error("[WS] Error:", err);
+    ws.close();
+  };
+}
+
+// ─────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────
+buildHistoryGrid();
+connect();
+</script>
+</body>
+</html>
